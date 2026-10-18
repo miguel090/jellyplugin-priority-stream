@@ -1,0 +1,105 @@
+name: Release
+
+# Push a tag like v1.2.0 to build the plugin, attach the zip to a GitHub release and add the
+# version to manifest.json on the default branch (the URL you add under Dashboard -> Plugins -> Repositories).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the leading v, e.g. 1.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TARGET_ABI: '12.2.0.0'
+  PLUGIN_NAME: 'Live TV Priority'
+  PLUGIN_GUID: '443cd6fe-a768-4ae2-a39e-e87e0e8e359d'
+  ZIP_PREFIX: 'live-tv-priority'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version
+        id: v
+        run: |
+          RAW="${{ github.event.inputs.version || github.ref_name }}"
+          RAW="${RAW#v}"
+          # Jellyfin plugin versions have four parts.
+          IFS='.' read -r A B C D <<< "$RAW"
+          VERSION="${A:-0}.${B:-0}.${C:-0}.${D:-0}"
+          echo "tag=v${RAW}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "zip=${ZIP_PREFIX}_${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Build
+        run: >
+          dotnet publish src/Jellyfin.Plugin.LiveTvPriority -c Release -o out
+          -p:Version=${{ steps.v.outputs.version }}
+          -p:AssemblyVersion=${{ steps.v.outputs.version }}
+          -p:FileVersion=${{ steps.v.outputs.version }}
+
+      - name: Package
+        id: pkg
+        run: |
+          mkdir -p pkg
+          cp out/Jellyfin.Plugin.LiveTvPriority.dll pkg/
+          cat > pkg/meta.json <<EOF
+          {
+            "category": "Live TV",
+            "changelog": "See https://github.com/${{ github.repository }}/releases/tag/${{ steps.v.outputs.tag }}",
+            "description": "Lets priority users take over the Live TV tuner from other sessions.",
+            "guid": "${PLUGIN_GUID}",
+            "name": "${PLUGIN_NAME}",
+            "overview": "Tuner preemption for priority users on single-tuner Live TV setups.",
+            "owner": "${{ github.repository_owner }}",
+            "targetAbi": "${TARGET_ABI}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "version": "${{ steps.v.outputs.version }}"
+          }
+          EOF
+          (cd pkg && zip -X -r "../${{ steps.v.outputs.zip }}" .)
+          echo "md5=$(md5sum '${{ steps.v.outputs.zip }}' | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "${{ steps.v.outputs.tag }}" >/dev/null 2>&1; then
+            gh release create "${{ steps.v.outputs.tag }}" --title "${{ steps.v.outputs.tag }}" --generate-notes --target "${{ github.sha }}"
+          fi
+          gh release upload "${{ steps.v.outputs.tag }}" "${{ steps.v.outputs.zip }}" --clobber
+
+      - name: Update manifest.json on the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout -B manifest-update "origin/$DEFAULT_BRANCH"
+          python3 .github/scripts/update_manifest.py manifest.json \
+            --guid "$PLUGIN_GUID" \
+            --version "${{ steps.v.outputs.version }}" \
+            --target-abi "$TARGET_ABI" \
+            --source-url "https://github.com/${{ github.repository }}/releases/download/${{ steps.v.outputs.tag }}/${{ steps.v.outputs.zip }}" \
+            --checksum "${{ steps.pkg.outputs.md5 }}" \
+            --changelog "See https://github.com/${{ github.repository }}/releases/tag/${{ steps.v.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "manifest: add ${{ steps.v.outputs.version }}" || echo "manifest unchanged"
+          git push origin "HEAD:$DEFAULT_BRANCH"

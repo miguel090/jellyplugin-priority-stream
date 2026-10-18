@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Live TV Priority</title>
+</head>
+<body>
+    <div id="LiveTvPriorityConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-textarea">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="LiveTvPriorityConfigForm">
+                    <div class="verticalSection">
+                        <h2 class="sectionTitle">Live TV Priority</h2>
+                        <p>When a priority user starts a Live TV channel and the tuner is busy with a different channel,
+                            the other session is stopped and its tuner released before the priority stream is opened.</p>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="Enabled" type="checkbox" is="emby-checkbox" />
+                            <span>Enable preemption</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">When off, Live TV behaves exactly as without the plugin.</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Priority users</h3>
+                        <div id="PriorityUsers" class="checkboxList paperList" style="padding: .5em 1em;"></div>
+                        <div class="fieldDescription">These users can take over the tuner. Everybody else keeps the default behavior.</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Message to the preempted session</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="SendKickMessage" type="checkbox" is="emby-checkbox" />
+                                <span>Show a message on the preempted client</span>
+                            </label>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="KickMessageHeader">Message title</label>
+                            <input id="KickMessageHeader" type="text" is="emby-input" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="KickMessageText">Message text</label>
+                            <input id="KickMessageText" type="text" is="emby-input" />
+                            <div class="fieldDescription"><code>{user}</code> is replaced with the priority user's name.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="KickMessageTimeoutMs">Message display time (ms)</label>
+                            <input id="KickMessageTimeoutMs" type="number" is="emby-input" min="0" step="500" />
+                            <div class="fieldDescription">0 lets the client decide. Not every client honours this.</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">What can be preempted</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="PreemptOwnDevices" type="checkbox" is="emby-checkbox" />
+                                <span>The priority user's own other devices</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">E.g. the living-room TV is stopped when the same user starts another channel on the phone.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="PreemptRecordings" type="checkbox" is="emby-checkbox" />
+                                <span>Active DVR recordings</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">When on, an in-progress recording on another channel is cancelled. Off by default.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="PriorityUsersPreemptEachOther" type="checkbox" is="emby-checkbox" />
+                                <span>Priority users can preempt each other</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">When off, a priority user who is watching is never kicked by another priority user.</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Timing</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TunerReleaseTimeoutSeconds">Tuner release timeout (seconds)</label>
+                            <input id="TunerReleaseTimeoutSeconds" type="number" is="emby-input" min="0" max="60" />
+                            <div class="fieldDescription">How long the priority request waits for the tuner to be released before continuing anyway.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="UpstreamSettleDelayMs">Upstream settle delay (ms)</label>
+                            <input id="UpstreamSettleDelayMs" type="number" is="emby-input" min="0" max="30000" step="100" />
+                            <div class="fieldDescription">Extra pause after the tuner is released so Dispatcharr / the IPTV provider can drop the old connection.</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Advanced</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="PreemptOnPlaybackInfo" type="checkbox" is="emby-checkbox" />
+                                <span>Preempt as early as the PlaybackInfo request</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Recommended. Turn off only if a client requests PlaybackInfo for channels it does not play.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TunerCountOverride">Number of tuners</label>
+                            <input id="TunerCountOverride" type="number" is="emby-input" min="0" max="64" />
+                            <div class="fieldDescription">0 = use the tuner count from the Live TV tuner settings (1 if unknown). Preemption only happens when every tuner is busy.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="VerboseLogging" type="checkbox" is="emby-checkbox" />
+                                <span>Verbose logging</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Log every decision at Information level. Preemptions are always logged.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '443cd6fe-a768-4ae2-a39e-e87e0e8e359d';
+                var page = document.querySelector('#LiveTvPriorityConfigPage');
+                var checkboxes = ['Enabled', 'SendKickMessage', 'PreemptOwnDevices', 'PreemptRecordings', 'PriorityUsersPreemptEachOther', 'PreemptOnPlaybackInfo', 'VerboseLogging'];
+                var texts = ['KickMessageHeader', 'KickMessageText'];
+                var numbers = ['KickMessageTimeoutMs', 'TunerReleaseTimeoutSeconds', 'UpstreamSettleDelayMs', 'TunerCountOverride'];
+
+                function normalizeId(id) {
+                    return (id || '').replace(/-/g, '').toLowerCase();
+                }
+
+                function renderUsers(users, selectedIds) {
+                    var selected = (selectedIds || []).map(normalizeId);
+                    var container = page.querySelector('#PriorityUsers');
+                    container.innerHTML = '';
+                    users.forEach(function (user) {
+                        var label = document.createElement('label');
+                        label.className = 'emby-checkbox-label';
+                        label.style.display = 'block';
+                        var input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.setAttribute('is', 'emby-checkbox');
+                        input.className = 'chkPriorityUser';
+                        input.setAttribute('data-userid', user.Id);
+                        input.checked = selected.indexOf(normalizeId(user.Id)) !== -1;
+                        var span = document.createElement('span');
+                        span.textContent = user.Name;
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        container.appendChild(label);
+                    });
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers()]).then(function (results) {
+                        var config = results[0];
+                        checkboxes.forEach(function (key) { page.querySelector('#' + key).checked = !!config[key]; });
+                        texts.forEach(function (key) { page.querySelector('#' + key).value = config[key] || ''; });
+                        numbers.forEach(function (key) { page.querySelector('#' + key).value = config[key] != null ? config[key] : 0; });
+                        renderUsers(results[1], config.PriorityUserIds);
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                page.querySelector('#LiveTvPriorityConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        checkboxes.forEach(function (key) { config[key] = page.querySelector('#' + key).checked; });
+                        texts.forEach(function (key) { config[key] = page.querySelector('#' + key).value; });
+                        numbers.forEach(function (key) { config[key] = parseInt(page.querySelector('#' + key).value, 10) || 0; });
+                        config.PriorityUserIds = Array.prototype.map.call(
+                            page.querySelectorAll('.chkPriorityUser:checked'),
+                            function (el) { return el.getAttribute('data-userid'); });
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    });
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

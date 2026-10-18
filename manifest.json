@@ -1,0 +1,11 @@
+[
+  {
+    "guid": "443cd6fe-a768-4ae2-a39e-e87e0e8e359d",
+    "name": "Live TV Priority",
+    "description": "Lets priority users take over the Live TV tuner from other sessions.",
+    "overview": "Tuner preemption for priority users on single-tuner Live TV setups (e.g. IPTV -> Dispatcharr -> HDHomeRun).",
+    "owner": "miguel090",
+    "category": "Live TV",
+    "versions": []
+  }
+]
