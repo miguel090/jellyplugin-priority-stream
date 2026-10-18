@@ -1,7 +1,7 @@
 name: Release
 
 # Push a tag like v1.2.0 to build the plugin, attach the zip to a GitHub release and add the
-# version to manifest.json on the default branch (the URL you add under Dashboard -> Plugins -> Repositories).
+# version to manifest.json on the main branch (the URL you add under Dashboard -> Plugins -> Repositories).
 on:
   push:
     tags: ['v*']
@@ -85,12 +85,13 @@ jobs:
           fi
           gh release upload "${{ steps.v.outputs.tag }}" "${{ steps.v.outputs.zip }}" --clobber
 
-      - name: Update manifest.json on the default branch
+      - name: Update manifest.json on main
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # The README's repository URL points at main, whatever the repository's default branch is.
+          MANIFEST_BRANCH: main
         run: |
-          git fetch origin "$DEFAULT_BRANCH"
-          git checkout -B manifest-update "origin/$DEFAULT_BRANCH"
+          git fetch origin "$MANIFEST_BRANCH"
+          git checkout -B manifest-update "origin/$MANIFEST_BRANCH"
           python3 .github/scripts/update_manifest.py manifest.json \
             --guid "$PLUGIN_GUID" \
             --version "${{ steps.v.outputs.version }}" \
@@ -102,4 +103,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manifest.json
           git commit -m "manifest: add ${{ steps.v.outputs.version }}" || echo "manifest unchanged"
-          git push origin "HEAD:$DEFAULT_BRANCH"
+          git push origin "HEAD:$MANIFEST_BRANCH"

@@ -58,7 +58,6 @@ Live TV preemption: tuner released for "dad" -> "BBC One" after 512 ms.
 1. Dashboard → **Plugins** → **Repositories** → **+**
    - Name: `Live TV Priority`
    - URL: `https://raw.githubusercontent.com/miguel090/jellyplugin-priority-stream/main/manifest.json`
-     (replace `main` with the repository's default branch if it is different)
 2. **Catalog** → *Live TV Priority* → **Install**.
 3. Restart Jellyfin (`docker restart jellyfin`).
 4. Dashboard → Plugins → *Live TV Priority*: pick the priority user(s) and save.
@@ -125,7 +124,7 @@ Push a tag: `git tag v1.0.0 && git push origin v1.0.0` (or run the *Release* wor
 
 1. runs the tests and builds with version `1.0.0.0`,
 2. zips the dll with a `meta.json`, computes its MD5 and attaches the zip to a GitHub release,
-3. adds the version to `manifest.json` on the default branch, which is what Jellyfin reads.
+3. adds the version to `manifest.json` on `main`, which is what Jellyfin reads.
 
 ## Known limitations
 
