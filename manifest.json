@@ -8,6 +8,14 @@
     "category": "Live TV",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "changelog": "See https://github.com/miguel090/jellyplugin-priority-stream/releases/tag/v1.1.0",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/miguel090/jellyplugin-priority-stream/releases/download/v1.1.0/live-tv-priority_1.1.0.0.zip",
+        "checksum": "4875b486f7cb65dee9809c62647a7c99",
+        "timestamp": "2026-10-18T21:41:03Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "See https://github.com/miguel090/jellyplugin-priority-stream/releases/tag/v1.0.0",
         "targetAbi": "12.2.0.0",
