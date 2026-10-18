@@ -1,11 +1,14 @@
 """Fake HDHomeRun with ONE upstream connection (like a 1-connection IPTV account behind Dispatcharr).
 
 A second concurrent stream gets HTTP 503. Every OPEN / CLOSE / REJECT is appended to the log file.
+Set FAKE_MODEL=HDTC-2US to emulate a model that offers several stream variants.
 Usage: python3 fakehdhr.py <stream.ts> <log file>
 """
 import json, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 PORT = 5004
+import os
+MODEL = os.environ.get("FAKE_MODEL", "HDHR5-4US")
 BASE = f"http://127.0.0.1:{PORT}"
 DATA = open(sys.argv[1], "rb").read()
 lock = threading.Lock()
@@ -20,7 +23,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         if p == "/discover.json":
-            return self.j({"FriendlyName": "FakeHDHR", "ModelNumber": "HDHR5-4US", "FirmwareName": "hdhomerun5_atsc", "FirmwareVersion": "20200101",
+            return self.j({"FriendlyName": "FakeHDHR", "ModelNumber": MODEL, "FirmwareName": "hdhomerun5_atsc", "FirmwareVersion": "20200101",
                            "DeviceID": "1234ABCD", "DeviceAuth": "x", "BaseURL": BASE, "LineupURL": BASE + "/lineup.json", "TunerCount": 1})
         if p == "/lineup.json":
             return self.j([{"GuideNumber": "1", "GuideName": "Chan A", "URL": BASE + "/auto/v1"},

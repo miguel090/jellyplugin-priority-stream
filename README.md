@@ -7,6 +7,12 @@ When a priority user starts a Live TV channel while somebody else holds the only
 server-side, and the priority user's stream opens on the **same tap**: no error, no retry.
 On the **same** channel nothing happens; the stream is simply shared.
 
+**Normal users** who ask for a different channel while the tuner is busy are refused straight away,
+with a message saying who is watching what and which channel they can join instead
+(*"Bob is watching News. You can watch News instead."*).
+
+**Exempt channels** can be excluded from all of this, e.g. channels that don't use the limited connection.
+
 Built for: IPTV provider (1 connection) → Dispatcharr → HDHomeRun emulation → Jellyfin Live TV.
 Works with any client (web, Android TV, mobile, Fire TV) because everything happens on the server.
 
@@ -88,6 +94,9 @@ server's plugin directory, then restart:
 | Upstream settle delay | 500 ms | Extra pause after the release so Dispatcharr/the provider can drop the old connection. |
 | Preempt at PlaybackInfo | on | Starts freeing the tuner at the earliest request. |
 | Number of tuners | 0 (auto) | 0 = sum of `TunerCount` from the Live TV tuner settings (1 if unknown). Preemption only happens when every tuner is busy. |
+| Refuse busy requests from normal users | **on** | When every tuner is busy with other channels, a normal user's request is refused before Jellyfin tries to tune, with the message below. Off: Jellyfin's normal error. |
+| Busy message title / text | `Live TV busy` / `{user} is watching {channel}. You can watch {channel} instead.` | `{user}` = who is watching (or "a recording"), `{channel}` = the tuned channel(s), joined with "or". |
+| Exempt channels | none | Channel picker with a filter box. The plugin ignores these channels completely: requesting one never kicks or blocks anyone, people watching one are never kicked, and they don't count as using a tuner. |
 | Verbose logging | off | Logs every decision at Information level. Preemptions are always logged. |
 
 ## Dispatcharr / upstream tuning
@@ -139,6 +148,11 @@ Push a tag: `git tag v1.0.0 && git push origin v1.0.0` (or run the *Release* wor
   flight, that request waits behind the priority request and then fails the normal way (tuner busy).
 - **Upstream delays are outside Jellyfin.** If Dispatcharr or the provider keeps the old connection
   open longer than timeout + settle delay, the new channel can still fail. See the tuning section.
+- **Busy refusals show two notices on some clients.** The plugin sends the busy message and also answers
+  the request with an error. The web client then shows its own "not authorized to play" dialog next to
+  the message, because Jellyfin has no "tuner busy" error code.
+- **Exempt channels are invisible to the plugin.** If an exempt channel does go through the limited
+  connection, the plugin won't free the tuner from it or for it, and Jellyfin's normal tuner error applies.
 - **The coordination is per server.** The lock is in-memory, which is fine for one Jellyfin instance.
 
 ## Manual test plan

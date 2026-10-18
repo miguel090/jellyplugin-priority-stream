@@ -7,6 +7,8 @@ using Jellyfin.Plugin.LiveTvPriority.Preemption;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.LiveTv;
+using MediaBrowser.Model.Dlna;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.MediaInfo;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -120,6 +122,14 @@ public sealed class LiveTvPriorityActionFilter : IAsyncActionFilter
             return;
         }
 
+        if (config.ExemptChannelIds?.Contains(target.Channel.Id) ?? false)
+        {
+            // Exempt channels are outside the plugin's rules: default Jellyfin behavior.
+            Log(config, "Live TV request for exempt channel {Channel}; not interfering.", target.Channel.Name);
+            await next().ConfigureAwait(false);
+            return;
+        }
+
         var ct = context.HttpContext.RequestAborted;
         var isPriority = config.PriorityUserIds?.Contains(userId) ?? false;
         var timeout = TimeSpan.FromSeconds(Math.Max(0, config.TunerReleaseTimeoutSeconds) + 30);
@@ -137,6 +147,21 @@ public sealed class LiveTvPriorityActionFilter : IAsyncActionFilter
             // waits and then sees this stream instead of failing to tune next to an invisible one.
             using (await _arbiter.EnterAsync(timeout, ct).ConfigureAwait(false))
             {
+                if (config.BlockWhenBusy
+                    && await _preemptionService.CheckBusyAsync(target.Channel.Id, deviceId, config).ConfigureAwait(false) is { } tuned)
+                {
+                    var text = await _preemptionService.NotifyBusyAsync(userId, deviceId, tuned, config).ConfigureAwait(false);
+                    _logger.LogInformation(
+                        "Live TV busy: refused {User} on {Device} -> {Channel} via {Action}. {Message}",
+                        GetUserName(userId),
+                        deviceId,
+                        target.Channel.Name,
+                        action.ActionName,
+                        text);
+                    context.Result = BusyResult(kind, text, config);
+                    return;
+                }
+
                 var executedNonPriority = await next().ConfigureAwait(false);
                 RecordOpenedStream(executedNonPriority, userId, deviceId, target);
             }
@@ -260,6 +285,33 @@ public sealed class LiveTvPriorityActionFilter : IAsyncActionFilter
         }
 
         return item is LiveTvChannel channel ? new Target(channel, opensTuner) : null;
+    }
+
+    private static IActionResult BusyResult(LiveTvRequestKind kind, string text, PluginConfiguration config)
+    {
+        if (kind == LiveTvRequestKind.PlaybackInfo)
+        {
+            // Clients show their own "can't play" dialog for a PlaybackInfo error code; the message
+            // sent to the session explains why and what to watch instead.
+            return new ObjectResult(new PlaybackInfoResponse
+            {
+                MediaSources = Array.Empty<MediaSourceInfo>(),
+                ErrorCode = PlaybackErrorCode.NotAllowed
+            })
+            {
+                StatusCode = StatusCodes.Status200OK
+            };
+        }
+
+        return new ObjectResult(new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = string.IsNullOrWhiteSpace(config.BusyMessageHeader) ? "Live TV busy" : config.BusyMessageHeader,
+            Detail = text
+        })
+        {
+            StatusCode = StatusCodes.Status409Conflict
+        };
     }
 
     private void RecordOpenedStream(ActionExecutedContext executed, Guid userId, string deviceId, Target target)

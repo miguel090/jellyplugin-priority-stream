@@ -70,7 +70,8 @@ def config(**kw):
     tok = ST["admin"]
     _, c = http("GET", f"/Plugins/{PLUGIN}/Configuration", token=tok, dev="setup")
     c.update({"Enabled": True, "PriorityUserIds": [ST["ids"]["prio"]], "VerboseLogging": True, "PreemptOnPlaybackInfo": True,
-              "PreemptOwnDevices": True, "TunerReleaseTimeoutSeconds": 5, "UpstreamSettleDelayMs": 500})
+              "PreemptOwnDevices": True, "TunerReleaseTimeoutSeconds": 5, "UpstreamSettleDelayMs": 500,
+              "BlockWhenBusy": True, "ExemptChannelIds": []})
     c.update(kw)
     code, _ = http("POST", f"/Plugins/{PLUGIN}/Configuration", c, tok, "setup")
     assert code in (200, 204), code
@@ -180,6 +181,45 @@ def two_priority_simultaneous(clients, mark):
     check("two simultaneous priority requests for the same channel: both succeed, one upstream connection", out["p1"][0] and out["p2"][0] and log.count("OPEN ch2") == 1 and not any("REJECT" in l for l in log),
           f"p1={out['p1'][:2]} p2={out['p2'][:2]} hdhr={log}")
 
+def busy_block(clients, mark):
+    bob = Client("bob", "bob-tv"); carol = Client("carol", "carol-tv"); clients += [bob, carol]
+    bob.play(A)
+    ok, res, _ = carol.play(Bc)
+    time.sleep(0.3)
+    log = hdhr_since(mark)
+    check("busy: normal user refused with the channel they can watch instead, no upstream attempt",
+          not ok and "NotAllowed" in str(res) and ("Message", "bob is watching Chan A. You can watch Chan A instead.") in carol.kinds()
+          and bob.kinds() == [] and log == ["OPEN ch1"], f"carol={ok} {res!r} msgs={carol.kinds()} bob={bob.kinds()} hdhr={log}")
+    ok2, res2, _ = carol.play(A)
+    check("busy: joining the suggested channel works (shared)", ok2 and hdhr_since(mark) == ["OPEN ch1"], f"carol={ok2} {res2!r} hdhr={hdhr_since(mark)}")
+
+def busy_open_path(clients, mark):
+    bob = Client("bob", "bob-tv"); carol = Client("carol", "carol-tv"); clients += [bob, carol]
+    bob.play(A, mode="open")
+    ok, res, _ = carol.play(Bc, mode="open")
+    check("busy via LiveStreams/Open: refused with 409 and the message", not ok and "409" in str(res) and any(k[0] == "Message" for k in carol.kinds()),
+          f"carol={ok} {str(res)[:160]!r} msgs={carol.kinds()}")
+
+def busy_disabled(clients, mark):
+    bob = Client("bob", "bob-tv"); carol = Client("carol", "carol-tv"); clients += [bob, carol]
+    bob.play(A)
+    ok, res, _ = carol.play(Bc)
+    check("busy blocking off: default Jellyfin failure, no message", not ok and "500" in str(res) and carol.kinds() == [], f"carol={ok} {res!r} msgs={carol.kinds()}")
+
+def exempt_viewer(clients, mark):
+    bob = Client("bob", "bob-tv"); prio = Client("prio", "prio-phone"); clients += [bob, prio]
+    bob.play(A)
+    ok, res, _ = prio.play(Bc)
+    check("exempt channel A: its viewer is not kicked by the priority user (plugin stays out)", not ok and bob.kinds() == [], f"prio={ok} {res!r} bob={bob.kinds()}")
+
+def exempt_request(clients, mark):
+    bob = Client("bob", "bob-tv"); carol = Client("carol", "carol-tv"); prio = Client("prio", "prio-phone"); clients += [bob, carol, prio]
+    bob.play(A)
+    ok, res, _ = carol.play(Bc)
+    okp, resp, _ = prio.play(Bc)
+    check("exempt channel B: normal user not blocked by the plugin, priority user does not preempt", not ok and "500" in str(res) and carol.kinds() == []
+          and not okp and bob.kinds() == [], f"carol={ok} {res!r} prio={okp} bob={bob.kinds()}")
+
 def hls_path(clients, mark):
     bob = Client("bob", "bob-tv"); prio = Client("prio", "prio-web"); clients += [bob, prio]
     bob.play(A)
@@ -224,4 +264,9 @@ scenario("two-prio", two_priority_simultaneous)
 scenario("race-open", race_open_in_progress)
 scenario("nonprio", nonpriority_unchanged)
 scenario("hls", hls_path, PreemptOnPlaybackInfo=False)
+scenario("busy", busy_block)
+scenario("busy-open", busy_open_path, PreemptOnPlaybackInfo=False)
+scenario("busy-off", busy_disabled, BlockWhenBusy=False)
+scenario("exempt-viewer", exempt_viewer, ExemptChannelIds=[A])
+scenario("exempt-request", exempt_request, ExemptChannelIds=[Bc])
 print(f"\n{sum(1 for _, ok in RESULTS if ok)}/{len(RESULTS)} checks passed")

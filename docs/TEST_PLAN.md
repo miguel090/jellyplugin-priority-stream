@@ -57,9 +57,33 @@ Verbose log: `… own device '…' is protected`.
 
 Also check: Dad zaps A → B on the **same** device. It switches normally, and no message is shown on that device.
 
+## (e) Normal user, tuner busy with another normal user
+
+1. Kid starts channel **A**.
+2. Mum (also a normal user) starts channel **B**.
+
+Expected: Mum's request is refused at once. Her device shows *"Kid is watching A. You can watch A instead."*,
+and the web client also shows its own "can't play" dialog. Kid is untouched, Dispatcharr never sees a
+request for B, and the log shows `Live TV busy: refused …`.
+
+3. Mum starts channel **A**: it plays (shared).
+
+With *Refuse busy requests from normal users* off, step 2 gives Jellyfin's normal error and no message.
+
+## (f) Exempt channels
+
+1. Mark channel **A** as exempt and save.
+2. Kid starts **A**, then Dad starts **B**.
+
+Expected: Kid is **not** kicked (the plugin ignores A). Dad gets whatever Jellyfin does by default.
+
+3. Mark **B** as exempt instead, and repeat with Mum starting **B** while Kid watches **A**.
+
+Expected: Mum is not refused by the plugin (no busy message). Jellyfin's default behavior applies.
+
 ## Extra checks
 
-- **Non-priority unchanged:** Dad watches A, Kid starts B. Kid gets the normal error and Dad is untouched.
+- **Normal users can't preempt:** Dad watches A, Kid starts B. Kid is refused with the busy message and Dad is untouched.
 - **Client ignores Stop:** use a client that doesn't react to remote control. Dad still gets B,
   because the stream is closed server-side.
 - **Plugin disabled:** with *Enable preemption* off, scenario (a) gives Dad the normal error.

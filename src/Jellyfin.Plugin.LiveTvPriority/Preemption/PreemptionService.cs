@@ -63,8 +63,9 @@ public sealed class PreemptionService
     /// <returns><c>true</c> if something was preempted.</returns>
     public async Task<bool> PreemptIfNeededAsync(PreemptionRequest request, PluginConfiguration config)
     {
-        var sessions = GetTunerHolders();
-        var recordings = await GetActiveRecordingsAsync().ConfigureAwait(false);
+        var exempt = ExemptSet(config);
+        var sessions = GetTunerHolders(exempt);
+        var recordings = (await GetActiveRecordingsAsync().ConfigureAwait(false)).Where(r => !exempt.Contains(r.ChannelId)).ToList();
         var tunerCount = GetTunerCount(config);
 
         var plan = PreemptionPlanner.Plan(request, sessions, recordings, config, tunerCount);
@@ -185,6 +186,82 @@ public sealed class PreemptionService
     }
 
     /// <summary>
+    /// Checks whether a channel can be tuned without preempting anyone.
+    /// </summary>
+    /// <param name="channelId">Requested channel.</param>
+    /// <param name="deviceId">Requesting device.</param>
+    /// <param name="config">Current configuration.</param>
+    /// <returns><c>null</c> if it can be tuned or shared; otherwise the tuned channels that can be joined instead.</returns>
+    public async Task<IReadOnlyList<TunedChannel>?> CheckBusyAsync(Guid channelId, string deviceId, PluginConfiguration config)
+    {
+        var exempt = ExemptSet(config);
+        var holders = GetTunerHolders(exempt);
+        var recordings = (await GetActiveRecordingsAsync().ConfigureAwait(false)).Where(r => !exempt.Contains(r.ChannelId)).ToList();
+        return PreemptionPlanner.CheckBusy(channelId, deviceId, holders, recordings, GetTunerCount(config));
+    }
+
+    /// <summary>
+    /// Tells the requesting device that the tuner is busy and which channels it can watch instead.
+    /// </summary>
+    /// <param name="userId">Requesting user.</param>
+    /// <param name="deviceId">Requesting device.</param>
+    /// <param name="tuned">Channels currently tuned.</param>
+    /// <param name="config">Current configuration.</param>
+    /// <returns>The message text.</returns>
+    public async Task<string> NotifyBusyAsync(Guid userId, string deviceId, IReadOnlyList<TunedChannel> tuned, PluginConfiguration config)
+    {
+        var text = FormatBusyMessage(config.BusyMessageText, tuned);
+        var session = _sessionManager.Sessions.FirstOrDefault(s =>
+            s.UserId == userId && string.Equals(s.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase));
+
+        if (session is not null && !string.IsNullOrWhiteSpace(text))
+        {
+            try
+            {
+                await _sessionManager.SendMessageCommand(
+                    null!,
+                    session.Id,
+                    new MessageCommand
+                    {
+                        Header = string.IsNullOrWhiteSpace(config.BusyMessageHeader) ? "Live TV busy" : config.BusyMessageHeader,
+                        Text = text,
+                        TimeoutMs = config.KickMessageTimeoutMs > 0 ? config.KickMessageTimeoutMs : null
+                    },
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not send busy message to session {SessionId}", session.Id);
+            }
+        }
+
+        return text;
+    }
+
+    /// <summary>
+    /// Fills the busy message placeholders.
+    /// </summary>
+    /// <param name="template">Message template.</param>
+    /// <param name="tuned">Channels currently tuned.</param>
+    /// <returns>The message.</returns>
+    public static string FormatBusyMessage(string? template, IReadOnlyList<TunedChannel> tuned)
+    {
+        var users = string.Join(", ", tuned.SelectMany(t => t.Watchers).Distinct(StringComparer.OrdinalIgnoreCase));
+        var channels = string.Join(" or ", tuned.Select(t => t.ChannelName).Distinct(StringComparer.OrdinalIgnoreCase));
+        return (template ?? string.Empty)
+            .Replace(PluginConfiguration.UserPlaceholder, users.Length > 0 ? users : "Someone", StringComparison.OrdinalIgnoreCase)
+            .Replace(PluginConfiguration.ChannelPlaceholder, channels, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gets the configured exempt channels.
+    /// </summary>
+    /// <param name="config">Configuration.</param>
+    /// <returns>The set.</returns>
+    public static IReadOnlySet<Guid> ExemptSet(PluginConfiguration config)
+        => new HashSet<Guid>(config.ExemptChannelIds ?? Array.Empty<Guid>());
+
+    /// <summary>
     /// Remembers a live stream that an intercepted request just opened, until the client reports playback.
     /// </summary>
     /// <param name="userId">User that opened it.</param>
@@ -222,11 +299,13 @@ public sealed class PreemptionService
     /// still open, plus streams opened through the API that the client has not reported as playing yet.
     /// </summary>
     /// <returns>The holders.</returns>
-    internal List<LiveSession> GetTunerHolders()
+    /// <param name="exemptChannels">Channels to leave out (they do not use the shared tuner).</param>
+    internal List<LiveSession> GetTunerHolders(IReadOnlySet<Guid>? exemptChannels = null)
     {
         // A session whose reported live stream was closed (e.g. preempted, but its client never reported stop)
         // no longer holds a tuner.
         var holders = GetLiveSessions()
+            .Where(s => exemptChannels is null || !exemptChannels.Contains(s.ChannelId))
             .Where(s => string.IsNullOrEmpty(s.LiveStreamId) || _mediaSourceManager.GetLiveStreamInfo(s.LiveStreamId) is not null)
             .ToList();
 
@@ -243,7 +322,10 @@ public sealed class PreemptionService
                 continue;
             }
 
-            holders.Add(pending.Session);
+            if (exemptChannels is null || !exemptChannels.Contains(pending.Session.ChannelId))
+            {
+                holders.Add(pending.Session);
+            }
         }
 
         return holders;
@@ -307,7 +389,7 @@ public sealed class PreemptionService
             var timers = await _liveTvManager.GetTimers(new TimerQuery { IsActive = true }, CancellationToken.None).ConfigureAwait(false);
             return timers.Items
                 .Where(t => t.Status == RecordingStatus.InProgress)
-                .Select(t => new ActiveRecording(t.Id, t.ChannelId, t.Name ?? t.ChannelName ?? t.Id))
+                .Select(t => new ActiveRecording(t.Id, t.ChannelId, t.Name ?? t.ChannelName ?? t.Id, t.ChannelName))
                 .ToList();
         }
         catch (Exception ex)

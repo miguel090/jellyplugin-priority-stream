@@ -36,7 +36,14 @@ public sealed record LiveSession(
 /// <param name="TimerId">Timer id (used to cancel it).</param>
 /// <param name="ChannelId">Channel being recorded.</param>
 /// <param name="Name">Program name, for logs.</param>
-public sealed record ActiveRecording(string TimerId, Guid ChannelId, string Name);
+/// <param name="ChannelName">Channel name, if known.</param>
+public sealed record ActiveRecording(string TimerId, Guid ChannelId, string Name, string? ChannelName = null);
+
+/// <summary>A tuned channel that can be joined instead of a busy one.</summary>
+/// <param name="ChannelId">Channel id.</param>
+/// <param name="ChannelName">Channel name.</param>
+/// <param name="Watchers">Who is on it: user names, or "a recording".</param>
+public sealed record TunedChannel(Guid ChannelId, string ChannelName, IReadOnlyList<string> Watchers);
 
 /// <summary>How a session is preempted.</summary>
 public enum VictimKind

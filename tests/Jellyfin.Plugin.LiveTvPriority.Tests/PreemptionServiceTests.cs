@@ -247,4 +247,35 @@ public class PreemptionServiceTests
         var holder = Assert.Single(service.GetTunerHolders());
         Assert.Equal("bob", holder.SessionId);
     }
+
+    [Fact]
+    public async Task ExemptChannel_ViewerIsNeverPreempted_AndDoesNotHoldTheTuner()
+    {
+        AddLiveSession("victim", OtherUser, "living-room", ChannelA, "ls-a");
+        var config = Config();
+        config.ExemptChannelIds = [ChannelA];
+
+        var preempted = await CreateService().PreemptIfNeededAsync(Request(ChannelB), config);
+
+        Assert.False(preempted);
+        Assert.Contains("ls-a", _openStreams);
+        Assert.Null(await CreateService().CheckBusyAsync(ChannelB, "carol-tv", config));
+    }
+
+    [Fact]
+    public async Task CheckBusy_NotifiesTheRequesterWithTheAlternative()
+    {
+        AddLiveSession("bob", OtherUser, "living-room", ChannelA, "ls-a");
+        var carol = AddLiveSession("carol", Guid.NewGuid(), "carol-tv", ChannelA, null);
+        carol.NowPlayingItem = null;
+        var service = CreateService();
+
+        var tuned = await service.CheckBusyAsync(ChannelB, "carol-tv", Config());
+        var text = await service.NotifyBusyAsync(carol.UserId, "carol-tv", tuned!, Config());
+
+        Assert.Equal("Bob is watching Channel A. You can watch Channel A instead.", text);
+        _sessionManager.Verify(
+            m => m.SendMessageCommand(null!, "carol", It.Is<MessageCommand>(c => c.Text == text && c.Header == "Live TV busy"), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }

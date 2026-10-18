@@ -11,6 +11,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Placeholder replaced with the priority user's name in the kick message.</summary>
     public const string UserPlaceholder = "{user}";
 
+    /// <summary>Placeholder replaced with the channel name(s) in the busy message.</summary>
+    public const string ChannelPlaceholder = "{channel}";
+
     /// <summary>Gets or sets a value indicating whether preemption is enabled at all.</summary>
     public bool Enabled { get; set; } = true;
 
@@ -58,6 +61,28 @@ public class PluginConfiguration : BasePluginConfiguration
     /// configuration, and assume 1 when it is unknown".
     /// </summary>
     public int TunerCountOverride { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a non-priority request for a channel that cannot be tuned
+    /// (every tuner busy with other channels) is refused up front, with a message naming the channels
+    /// that can be joined instead.
+    /// </summary>
+    public bool BlockWhenBusy { get; set; } = true;
+
+    /// <summary>Gets or sets the header of the "tuner busy" message.</summary>
+    public string BusyMessageHeader { get; set; } = "Live TV busy";
+
+    /// <summary>
+    /// Gets or sets the "tuner busy" message. <c>{user}</c> = who is watching, <c>{channel}</c> = the channel(s)
+    /// that can be watched instead.
+    /// </summary>
+    public string BusyMessageText { get; set; } = "{user} is watching {channel}. You can watch {channel} instead.";
+
+    /// <summary>
+    /// Gets or sets channels the plugin ignores completely: requests for them are never blocked and never
+    /// preempt anyone, sessions on them are never preempted, and they do not count as using a tuner.
+    /// </summary>
+    public Guid[] ExemptChannelIds { get; set; } = Array.Empty<Guid>();
 
     /// <summary>Gets or sets a value indicating whether decisions are logged at Information level.</summary>
     public bool VerboseLogging { get; set; }

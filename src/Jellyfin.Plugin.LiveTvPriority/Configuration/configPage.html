@@ -54,6 +54,37 @@
                     </div>
 
                     <div class="verticalSection">
+                        <h3 class="sectionTitle">Normal users when the tuner is busy</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="BlockWhenBusy" type="checkbox" is="emby-checkbox" />
+                                <span>Refuse the request and suggest a channel they can watch</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">When every tuner is busy with other channels, a normal user's request is refused straight away and they are told which channel(s) are on, so they can join one of those.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="BusyMessageHeader">Message title</label>
+                            <input id="BusyMessageHeader" type="text" is="emby-input" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="BusyMessageText">Message text</label>
+                            <input id="BusyMessageText" type="text" is="emby-input" />
+                            <div class="fieldDescription"><code>{user}</code> = who is watching, <code>{channel}</code> = the channel(s) they can watch instead.</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Exempt channels</h3>
+                        <div class="fieldDescription" style="margin-bottom: .5em;">The plugin ignores these channels completely: requesting one never kicks or blocks anyone, people watching one are never kicked, and they don't count as using the tuner. Use this for channels that don't go through the limited connection.</div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="ChannelFilter">Filter channels</label>
+                            <input id="ChannelFilter" type="search" is="emby-input" />
+                        </div>
+                        <div id="ExemptSummary" class="fieldDescription"></div>
+                        <div id="ExemptChannels" class="checkboxList paperList" style="padding: .5em 1em; max-height: 22em; overflow-y: auto;"></div>
+                    </div>
+
+                    <div class="verticalSection">
                         <h3 class="sectionTitle">What can be preempted</h3>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
@@ -128,8 +159,9 @@
             (function () {
                 var pluginId = '443cd6fe-a768-4ae2-a39e-e87e0e8e359d';
                 var page = document.querySelector('#LiveTvPriorityConfigPage');
-                var checkboxes = ['Enabled', 'SendKickMessage', 'PreemptOwnDevices', 'PreemptRecordings', 'PriorityUsersPreemptEachOther', 'PreemptOnPlaybackInfo', 'VerboseLogging'];
-                var texts = ['KickMessageHeader', 'KickMessageText'];
+                var checkboxes = ['Enabled', 'BlockWhenBusy', 'SendKickMessage', 'PreemptOwnDevices', 'PreemptRecordings', 'PriorityUsersPreemptEachOther', 'PreemptOnPlaybackInfo', 'VerboseLogging'];
+                var texts = ['KickMessageHeader', 'KickMessageText', 'BusyMessageHeader', 'BusyMessageText'];
+                var exempt = {};
                 var numbers = ['KickMessageTimeoutMs', 'TunerReleaseTimeoutSeconds', 'UpstreamSettleDelayMs', 'TunerCountOverride'];
 
                 function normalizeId(id) {
@@ -158,14 +190,65 @@
                     });
                 }
 
+                function renderChannels(channels) {
+                    var container = page.querySelector('#ExemptChannels');
+                    container.innerHTML = '';
+                    if (!channels.length) {
+                        container.textContent = 'No Live TV channels found.';
+                    }
+                    channels.forEach(function (channel) {
+                        var label = document.createElement('label');
+                        label.className = 'emby-checkbox-label exemptChannelRow';
+                        label.style.display = 'block';
+                        var input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.setAttribute('is', 'emby-checkbox');
+                        input.className = 'chkExemptChannel';
+                        input.setAttribute('data-channelid', normalizeId(channel.Id));
+                        input.checked = !!exempt[normalizeId(channel.Id)];
+                        input.addEventListener('change', function () {
+                            var id = this.getAttribute('data-channelid');
+                            if (this.checked) { exempt[id] = true; } else { delete exempt[id]; }
+                            updateSummary();
+                        });
+                        var span = document.createElement('span');
+                        span.textContent = (channel.ChannelNumber ? channel.ChannelNumber + '  ' : '') + channel.Name;
+                        label.setAttribute('data-filter', span.textContent.toLowerCase());
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        container.appendChild(label);
+                    });
+                    updateSummary();
+                }
+
+                function updateSummary() {
+                    var count = Object.keys(exempt).length;
+                    page.querySelector('#ExemptSummary').textContent = count ? count + ' channel(s) exempt.' : 'No exempt channels.';
+                }
+
+                page.querySelector('#ChannelFilter').addEventListener('input', function () {
+                    var q = this.value.trim().toLowerCase();
+                    page.querySelectorAll('.exemptChannelRow').forEach(function (row) {
+                        row.style.display = !q || row.getAttribute('data-filter').indexOf(q) !== -1 ? 'block' : 'none';
+                    });
+                });
+
+                function getChannels() {
+                    var url = ApiClient.getUrl('LiveTv/Channels', { UserId: ApiClient.getCurrentUserId(), SortBy: 'SortName', EnableImages: false, EnableUserData: false });
+                    return ApiClient.getJSON(url).then(function (result) { return result.Items || []; }, function () { return []; });
+                }
+
                 page.addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();
-                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers()]).then(function (results) {
+                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers(), getChannels()]).then(function (results) {
                         var config = results[0];
                         checkboxes.forEach(function (key) { page.querySelector('#' + key).checked = !!config[key]; });
                         texts.forEach(function (key) { page.querySelector('#' + key).value = config[key] || ''; });
                         numbers.forEach(function (key) { page.querySelector('#' + key).value = config[key] != null ? config[key] : 0; });
                         renderUsers(results[1], config.PriorityUserIds);
+                        exempt = {};
+                        (config.ExemptChannelIds || []).forEach(function (id) { exempt[normalizeId(id)] = true; });
+                        renderChannels(results[2]);
                         Dashboard.hideLoadingMsg();
                     });
                 });
@@ -180,6 +263,8 @@
                         config.PriorityUserIds = Array.prototype.map.call(
                             page.querySelectorAll('.chkPriorityUser:checked'),
                             function (el) { return el.getAttribute('data-userid'); });
+                        // Kept from the in-memory set, so channels hidden by the filter (or no longer listed) stay exempt.
+                        config.ExemptChannelIds = Object.keys(exempt);
                         return ApiClient.updatePluginConfiguration(pluginId, config);
                     }).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

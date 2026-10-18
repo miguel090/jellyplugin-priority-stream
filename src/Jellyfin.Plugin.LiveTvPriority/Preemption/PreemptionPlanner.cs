@@ -102,6 +102,52 @@ public static class PreemptionPlanner
         return plan;
     }
 
+    /// <summary>
+    /// Checks whether <paramref name="channelId"/> can be tuned without preempting anyone.
+    /// </summary>
+    /// <param name="channelId">Requested channel.</param>
+    /// <param name="deviceId">Requesting device. Its own streams are ignored: a device switching channel releases them.</param>
+    /// <param name="holders">Sessions holding a tuner.</param>
+    /// <param name="recordings">In-progress recordings.</param>
+    /// <param name="tunerCount">Number of tuners (at least 1).</param>
+    /// <returns><c>null</c> if the channel can be tuned or shared; otherwise the tuned channels that can be joined instead.</returns>
+    public static IReadOnlyList<TunedChannel>? CheckBusy(
+        Guid channelId,
+        string deviceId,
+        IReadOnlyCollection<LiveSession> holders,
+        IReadOnlyCollection<ActiveRecording> recordings,
+        int tunerCount)
+    {
+        if (holders.Any(h => h.ChannelId == channelId) || recordings.Any(r => r.ChannelId == channelId))
+        {
+            return null; // shared
+        }
+
+        var others = holders
+            .Where(h => string.IsNullOrEmpty(deviceId) || !string.Equals(h.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var tuned = others.Select(h => h.ChannelId)
+            .Concat(recordings.Select(r => r.ChannelId))
+            .Distinct()
+            .Select(id =>
+            {
+                var viewers = others.Where(h => h.ChannelId == id).ToList();
+                var recs = recordings.Where(r => r.ChannelId == id).ToList();
+                var name = viewers.FirstOrDefault()?.ChannelName
+                    ?? recs.Select(r => r.ChannelName).FirstOrDefault(n => !string.IsNullOrEmpty(n))
+                    ?? id.ToString("N", CultureInfo.InvariantCulture);
+                var watchers = viewers.Select(v => v.UserName)
+                    .Concat(recs.Count > 0 ? ["a recording"] : [])
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return new TunedChannel(id, name, watchers);
+            })
+            .ToList();
+
+        return tuned.Count < Math.Max(1, tunerCount) ? null : tuned;
+    }
+
     private static string? FindBlocker(
         PreemptionRequest request,
         List<LiveSession> channelSessions,
