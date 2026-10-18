@@ -151,6 +151,12 @@ Push a tag: `git tag v1.0.0 && git push origin v1.0.0` (or run the *Release* wor
 - **Busy refusals show two notices on some clients.** The plugin sends the busy message and also answers
   the request with an error. The web client then shows its own "not authorized to play" dialog next to
   the message, because Jellyfin has no "tuner busy" error code.
+- **Android phone app: use the Web player.** The Integrated (ExoPlayer) player of the Jellyfin Android app
+  (2.7.x) ignores a refused play request: it shows no error and stays open on a black screen, and the
+  plugin's message is hidden behind it. This is a bug in the app (`QueueManager.initializePlaybackQueue`
+  discards the error), and it affects any refused playback, not just this plugin. Until it's fixed, set the
+  phone app to Settings → Video player type → **Web player**, which shows the refusal and the message.
+  Takeovers by a priority user are not affected.
 - **Exempt channels are invisible to the plugin.** If an exempt channel does go through the limited
   connection, the plugin won't free the tuner from it or for it, and Jellyfin's normal tuner error applies.
 - **The coordination is per server.** The lock is in-memory, which is fine for one Jellyfin instance.
