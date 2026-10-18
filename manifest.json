@@ -6,6 +6,15 @@
     "overview": "Tuner preemption for priority users on single-tuner Live TV setups (e.g. IPTV -> Dispatcharr -> HDHomeRun).",
     "owner": "miguel090",
     "category": "Live TV",
-    "versions": []
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "See https://github.com/miguel090/jellyplugin-priority-stream/releases/tag/v1.0.0",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://github.com/miguel090/jellyplugin-priority-stream/releases/download/v1.0.0/live-tv-priority_1.0.0.0.zip",
+        "checksum": "4ff59b1116f1092d463f37acfa14555f",
+        "timestamp": "2026-10-18T14:33:34Z"
+      }
+    ]
   }
 ]
