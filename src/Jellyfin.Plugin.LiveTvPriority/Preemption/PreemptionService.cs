@@ -254,6 +254,17 @@ public sealed class PreemptionService
     }
 
     /// <summary>
+    /// Fills the kick message placeholders.
+    /// </summary>
+    /// <param name="template">Message template.</param>
+    /// <param name="request">The priority request that caused the kick.</param>
+    /// <returns>The message.</returns>
+    public static string FormatKickMessage(string? template, PreemptionRequest request)
+        => (template ?? string.Empty)
+            .Replace(PluginConfiguration.UserPlaceholder, request.UserName, StringComparison.OrdinalIgnoreCase)
+            .Replace(PluginConfiguration.ChannelPlaceholder, request.ChannelName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Gets the configured exempt channels.
     /// </summary>
     /// <param name="config">Configuration.</param>
@@ -442,7 +453,7 @@ public sealed class PreemptionService
                     new MessageCommand
                     {
                         Header = string.IsNullOrWhiteSpace(config.KickMessageHeader) ? "Live TV" : config.KickMessageHeader,
-                        Text = config.KickMessageText.Replace(PluginConfiguration.UserPlaceholder, request.UserName, StringComparison.OrdinalIgnoreCase),
+                        Text = FormatKickMessage(config.KickMessageText, request),
                         TimeoutMs = config.KickMessageTimeoutMs > 0 ? config.KickMessageTimeoutMs : null
                     },
                     CancellationToken.None).ConfigureAwait(false);

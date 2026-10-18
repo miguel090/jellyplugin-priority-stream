@@ -85,7 +85,7 @@ server's plugin directory, then restart:
 | Enable preemption | on | Off = behavior exactly as without the plugin. |
 | Priority users | none | Multi-select from Jellyfin users. Nobody else can preempt. |
 | Show a message | on | Uses `DisplayMessage`. Clients that don't support it just stop. |
-| Message title / text | `Live TV` / `Live TV was taken over by {user}.` | `{user}` = the priority user's name. |
+| Message title / text | `Live TV` / `Live TV was taken over by {user}. You can watch {channel} instead.` | `{user}` = the priority user's name, `{channel}` = the channel they started (the kicked user can join it). |
 | Message display time | 8000 ms | 0 = client default. |
 | Priority user's own other devices | **on** | E.g. the TV is stopped when the same user starts another channel on the phone. |
 | Active DVR recordings | **off** | On: an in-progress recording on another channel is cancelled. |

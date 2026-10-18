@@ -106,7 +106,7 @@ public class PreemptionServiceTests
         Assert.True(preempted);
         Assert.Equal(2, closes);
         _sessionManager.Verify(
-            m => m.SendMessageCommand(null!, "victim", It.Is<MessageCommand>(c => c.Text == "Live TV was taken over by Alice."), It.IsAny<CancellationToken>()),
+            m => m.SendMessageCommand(null!, "victim", It.Is<MessageCommand>(c => c.Text == "Live TV was taken over by Alice. You can watch Channel B instead."), It.IsAny<CancellationToken>()),
             Times.Once);
         _sessionManager.Verify(
             m => m.SendPlaystateCommand(null!, "victim", It.Is<PlaystateRequest>(r => r.Command == PlaystateCommand.Stop), It.IsAny<CancellationToken>()),

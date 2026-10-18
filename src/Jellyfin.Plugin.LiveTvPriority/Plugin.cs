@@ -26,6 +26,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+
+        // Settings saved by 1.0/1.1 still hold the old default kick message; give them the new one,
+        // which names the channel to watch instead. Edited messages are left alone.
+        if (string.Equals(Configuration.KickMessageText, PluginConfiguration.LegacyKickMessageText, StringComparison.Ordinal))
+        {
+            Configuration.KickMessageText = PluginConfiguration.DefaultKickMessageText;
+            SaveConfiguration();
+        }
     }
 
     /// <summary>Gets the current plugin instance.</summary>

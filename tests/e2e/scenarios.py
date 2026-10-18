@@ -108,7 +108,7 @@ def a_autoopen(clients, mark):
     time.sleep(0.3)
     log = hdhr_since(mark)
     check("(a) PlaybackInfo+AutoOpen: priority gets channel B", ok_b and ok_p, f"prio={ok_p} {res} in {dt:.2f}s")
-    check("(a) bob got the message with {user} replaced and a Stop", ("Message", "Live TV was taken over by prio.") in bob.kinds() and ("Playstate", "Stop") in bob.kinds(), str(bob.kinds()))
+    check("(a) bob got the message with {user} replaced and a Stop", ("Message", "Live TV was taken over by prio. You can watch Chan B instead.") in bob.kinds() and ("Playstate", "Stop") in bob.kinds(), str(bob.kinds()))
     check("(a) upstream: ch1 closed before ch2 opened, no 503", log == ["OPEN ch1", "CLOSE ch1", "OPEN ch2"], str(log))
 
 def a_openpath(clients, mark):

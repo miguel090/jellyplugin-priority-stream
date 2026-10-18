@@ -10,7 +10,7 @@ Keep the server log open: `docker logs -f jellyfin 2>&1 | grep -i "live tv"`.
 2. Dad starts channel **B** on the phone.
 
 Expected:
-- Within about 1–2 s, Kid's TV shows *"Live TV was taken over by Dad."* and playback stops.
+- Within about 1–2 s, Kid's TV shows *"Live TV was taken over by Dad. You can watch B instead."* and playback stops.
 - Dad's channel B starts on the first tap, with no error and no retry.
 - The log shows `Live TV preemption: "Dad" … stopping "Kid" … watching "A"` and then `tuner released … after N ms`.
 - Dispatcharr shows A stopped, then B started.

@@ -26,8 +26,17 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the header of the message shown on the preempted client.</summary>
     public string KickMessageHeader { get; set; } = "Live TV";
 
-    /// <summary>Gets or sets the message shown on the preempted client. Supports <c>{user}</c>.</summary>
-    public string KickMessageText { get; set; } = "Live TV was taken over by {user}.";
+    /// <summary>Default kick message.</summary>
+    public const string DefaultKickMessageText = "Live TV was taken over by {user}. You can watch {channel} instead.";
+
+    /// <summary>Kick message default of version 1.0/1.1; upgraded to <see cref="DefaultKickMessageText"/> if never edited.</summary>
+    public const string LegacyKickMessageText = "Live TV was taken over by {user}.";
+
+    /// <summary>
+    /// Gets or sets the message shown on the preempted client. <c>{user}</c> = the priority user,
+    /// <c>{channel}</c> = the channel they started (which the preempted user can join).
+    /// </summary>
+    public string KickMessageText { get; set; } = DefaultKickMessageText;
 
     /// <summary>Gets or sets how long the message stays on screen, in milliseconds.</summary>
     public int KickMessageTimeoutMs { get; set; } = 8000;
