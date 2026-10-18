@@ -58,7 +58,7 @@ jobs:
         id: pkg
         run: |
           mkdir -p pkg
-          cp out/Jellyfin.Plugin.LiveTvPriority.dll pkg/
+          cp out/Jellyfin.Plugin.LiveTvPriority.dll LICENSE pkg/
           cat > pkg/meta.json <<EOF
           {
             "category": "Live TV",

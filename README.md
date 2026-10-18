@@ -145,3 +145,7 @@ Push a tag: `git tag v1.0.0 && git push origin v1.0.0` (or run the *Release* wor
 ## Manual test plan
 
 See [docs/TEST_PLAN.md](docs/TEST_PLAN.md).
+
+## License
+
+[GNU General Public License v3.0](LICENSE). The plugin links against Jellyfin's GPL-licensed libraries.
